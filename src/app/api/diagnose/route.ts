@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Dify API設定が不足しています" }, { status: 500 });
     }
 
-    // Dify にファイルをアップロードしてfile_idを取得
+    // Dify にファイルをアップロードして file_id を取得
     const uploadForm = new FormData();
     uploadForm.append("file", imageFile);
     uploadForm.append("user", "palm-user");
@@ -35,60 +35,80 @@ export async function POST(req: NextRequest) {
     if (!uploadRes.ok) {
       const err = await uploadRes.text();
       console.error("Dify file upload error:", err);
-      return NextResponse.json({ error: "画像のアップロードに失敗しました" }, { status: 502 });
+      return NextResponse.json({ error: "画像のアップロードに失敗しました" }, { status: 500 });
     }
 
     const uploadData = await uploadRes.json();
     const fileId: string = uploadData.id;
 
-    // Dify ワークフロー実行
-    const runRes = await fetch(`${difyApiUrl}/workflows/run`, {
+    // Dify Chat-messages API（Chatflow / Chat アプリ向け）
+    const query = `以下の手相ラインを診断してください：${lineLabels}。
+各ラインについて、診断コメントと画像上の大まかな位置（左上を0,0、右下を1,1とした相対座標の配列）を
+以下のJSON形式で返してください。余計な説明は不要です。
+
+[
+  {
+    "line": "life",
+    "label": "生命線",
+    "description": "診断テキスト",
+    "coordinates": [[0.3, 0.5], [0.35, 0.7]]
+  }
+]
+
+lineキーの値は life / heart / head / fate / sun / marriage のいずれかを使用してください。`;
+
+    const runRes = await fetch(`${difyApiUrl}/chat-messages`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${difyApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        inputs: {
-          selected_lines: lineLabels,
-          image: {
+        inputs: {},
+        query,
+        response_mode: "blocking",
+        conversation_id: "",
+        user: "palm-user",
+        files: [
+          {
+            type: "image",
             transfer_method: "local_file",
             upload_file_id: fileId,
-            type: "image",
           },
-        },
-        response_mode: "blocking",
-        user: "palm-user",
+        ],
       }),
     });
 
     if (!runRes.ok) {
       const err = await runRes.text();
-      console.error("Dify workflow error:", err);
-      return NextResponse.json({ error: "診断の実行に失敗しました" }, { status: 502 });
+      console.error("Dify chat-messages error:", err);
+      return NextResponse.json({ error: "診断の実行に失敗しました" }, { status: 500 });
     }
 
     const runData = await runRes.json();
 
-    // Difyの出力をパース
-    // ワークフローのoutputsキーから結果を取得し、フロントエンド用に整形
-    const rawOutput = runData?.data?.outputs?.result ?? runData?.data?.outputs;
+    // Dify chatflow の応答テキストをパース
+    const rawAnswer: string = runData?.answer ?? "";
     let results: DiagnoseResponse["results"] = [];
 
-    if (typeof rawOutput === "string") {
-      // Difyが文字列JSONを返す場合
-      try {
-        results = JSON.parse(rawOutput);
-      } catch {
-        // JSONでない場合はプレーンテキストとして全体の結果を返す
-        results = selectedLines.map((key) => ({
-          line: key,
-          label: LINE_LABEL_MAP[key],
-          description: rawOutput,
-        }));
+    // JSON ブロックを抽出（```json ... ``` または裸のJSONに対応）
+    const jsonMatch = rawAnswer.match(/```(?:json)?\s*([\s\S]*?)```/) ??
+      rawAnswer.match(/(\[[\s\S]*\])/);
+
+    const jsonString = jsonMatch ? jsonMatch[1].trim() : rawAnswer.trim();
+
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (Array.isArray(parsed)) {
+        results = parsed;
       }
-    } else if (Array.isArray(rawOutput)) {
-      results = rawOutput;
+    } catch {
+      // JSONパース失敗時はプレーンテキストとして全ライン共通で返す
+      results = selectedLines.map((key) => ({
+        line: key,
+        label: LINE_LABEL_MAP[key],
+        description: rawAnswer || "診断結果を取得できませんでした。",
+      }));
     }
 
     return NextResponse.json({ results } satisfies DiagnoseResponse);
