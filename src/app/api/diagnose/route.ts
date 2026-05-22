@@ -90,18 +90,18 @@ ${themeInstructions}
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        inputs: {},
+        inputs: {
+          tesougazou: [
+            {
+              transfer_method: "local_file",
+              upload_file_id: fileId,
+              type: "image",
+            },
+          ],
+        },
         query,
         response_mode: "blocking",
-        conversation_id: "",
         user: "palm-user",
-        files: [
-          {
-            type: "image",
-            transfer_method: "local_file",
-            upload_file_id: fileId,
-          },
-        ],
       }),
     });
 
