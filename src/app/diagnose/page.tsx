@@ -5,17 +5,19 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/palm/ImageUploader";
-import { LineSelector } from "@/components/palm/LineSelector";
+import { ThemeSelector } from "@/components/palm/ThemeSelector";
+import { HandSelector } from "@/components/palm/HandSelector";
 import { ResultCanvas } from "@/components/palm/ResultCanvas";
 import { DiagnoseResultCard } from "@/components/palm/DiagnoseResult";
-import { PalmLineKey, DiagnoseResult } from "@/types/palm";
+import { DiagnoseResult, HandType, DiagnoseThemeKey } from "@/types/palm";
 
 type DiagnoseState = "idle" | "loading" | "done";
 
 export default function DiagnosePage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [selectedLines, setSelectedLines] = useState<PalmLineKey[]>(["life", "heart", "head"]);
+  const [selectedThemes, setSelectedThemes] = useState<DiagnoseThemeKey[]>(["overall"]);
+  const [handType, setHandType] = useState<HandType>("right");
   const [state, setState] = useState<DiagnoseState>("idle");
   const [results, setResults] = useState<DiagnoseResult[]>([]);
 
@@ -38,8 +40,8 @@ export default function DiagnosePage() {
       toast.error("手のひら画像をアップロードしてください");
       return;
     }
-    if (selectedLines.length === 0) {
-      toast.error("診断する手相を1つ以上選択してください");
+    if (selectedThemes.length === 0) {
+      toast.error("診断内容を1つ以上選択してください");
       return;
     }
 
@@ -47,7 +49,8 @@ export default function DiagnosePage() {
     try {
       const formData = new FormData();
       formData.append("image", imageFile);
-      formData.append("selectedLines", JSON.stringify(selectedLines));
+      formData.append("selectedThemes", JSON.stringify(selectedThemes));
+      formData.append("handType", handType);
 
       const res = await fetch("/api/diagnose", {
         method: "POST",
@@ -125,7 +128,6 @@ export default function DiagnosePage() {
         </div>
 
         {state !== "done" ? (
-          /* 入力エリア */
           <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {/* 左: 画像アップロード */}
             <div className="space-y-3">
@@ -135,13 +137,15 @@ export default function DiagnosePage() {
               <ImageUploader onImageSelect={handleImageSelect} previewUrl={previewUrl} />
             </div>
 
-            {/* 右: 設定 + ボタン */}
-            <div className="space-y-6 flex flex-col justify-between">
-              <LineSelector selected={selectedLines} onChange={setSelectedLines} />
-
+            {/* 右: 設定 */}
+            <div className="space-y-5 flex flex-col">
+              <HandSelector selected={handType} onChange={setHandType} />
+              <div className="flex-1">
+                <ThemeSelector selected={selectedThemes} onChange={setSelectedThemes} />
+              </div>
               <Button
                 onClick={handleDiagnose}
-                disabled={!imageFile || selectedLines.length === 0 || state === "loading"}
+                disabled={!imageFile || selectedThemes.length === 0 || state === "loading"}
                 className="w-full bg-[oklch(0.78_0.12_85)] hover:bg-[oklch(0.72_0.12_85)] disabled:opacity-40 text-[oklch(0.12_0.02_280)] font-medium tracking-[0.15em] py-6 text-sm transition-all duration-300 hover:shadow-[0_0_30px_oklch(0.78_0.12_85/25%)]"
               >
                 {state === "loading" ? (
@@ -159,9 +163,8 @@ export default function DiagnosePage() {
             </div>
           </div>
         ) : (
-          /* 結果エリア */
           <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {/* 左: ライン描画済み画像 */}
+            {/* 左: 画像（ライン描画） */}
             <div className="space-y-3">
               <p className="text-[oklch(0.65_0.02_80)] text-xs tracking-wider">
                 手相ライン
@@ -170,8 +173,8 @@ export default function DiagnosePage() {
             </div>
 
             {/* 右: テキスト結果 */}
-            <div className="space-y-3">
-              <DiagnoseResultCard results={results} />
+            <div className="space-y-3 overflow-y-auto max-h-[600px]">
+              <DiagnoseResultCard results={results} handType={handType} />
             </div>
           </div>
         )}
