@@ -58,7 +58,12 @@ export default function DiagnosePage() {
 
       if (!res.ok) throw new Error(data.error ?? "診断に失敗しました");
 
-      setResults(data.results);
+      // 片手モードのとき hand フィールドを正規化（Dify が誤ったラベルを返す場合の対策）
+      const correctHand = !rightHand ? "left" : !leftHand ? "right" : null;
+      const normalized = correctHand
+        ? (data.results as DiagnoseResult[]).map((r) => ({ ...r, hand: correctHand as DiagnoseResult["hand"] }))
+        : (data.results as DiagnoseResult[]);
+      setResults(normalized);
       setState("done");
       toast.success("診断が完了しました");
     } catch (err) {
@@ -77,9 +82,13 @@ export default function DiagnosePage() {
   const hasAnyImage = !!(leftHand || rightHand);
   const isBoth = !!(leftHand && rightHand);
 
-  // 左右別に結果を分類
-  const leftResults = results.filter((r) => r.hand === "left" || r.hand === "both");
-  const rightResults = results.filter((r) => r.hand === "right" || r.hand === "both");
+  // 左右別に結果を分類（hand フィールドが未設定の場合は両手に表示）
+  const leftResults = isBoth
+    ? results.filter((r) => !r.hand || r.hand === "left" || r.hand === "both")
+    : results;
+  const rightResults = isBoth
+    ? results.filter((r) => !r.hand || r.hand === "right" || r.hand === "both")
+    : results;
 
   return (
     <div className="min-h-screen relative">

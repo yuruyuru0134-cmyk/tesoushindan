@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { DiagnoseResult, DIAGNOSE_THEMES } from "@/types/palm";
+import { useEffect, useRef, useCallback } from "react";
+import { DiagnoseResult } from "@/types/palm";
 
 const THEME_COLORS: Record<string, string> = {
   overall: "#c9a84c",
@@ -19,54 +19,52 @@ interface Props {
 
 export function ResultCanvas({ imageUrl, results }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
-  useEffect(() => {
+  const drawLines = useCallback(() => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
+    const img = imgRef.current;
+    if (!canvas || !img || !img.complete || img.naturalWidth === 0) return;
+
+    const w = img.clientWidth;
+    const h = img.clientHeight;
+    if (w === 0 || h === 0) return;
+
+    canvas.width = w;
+    canvas.height = h;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const containerWidth = container.clientWidth;
-      const scale = containerWidth / img.naturalWidth;
-      canvas.width = containerWidth;
-      canvas.height = img.naturalHeight * scale;
+    ctx.clearRect(0, 0, w, h);
 
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    results.forEach((result) => {
+      if (!result.coordinates || result.coordinates.length < 2) return;
+      const color = THEME_COLORS[result.theme ?? "overall"] ?? "#c9a84c";
 
-      // 各テーマの座標を描画
-      results.forEach((result) => {
-        if (!result.coordinates || result.coordinates.length < 2) return;
-        const color = THEME_COLORS[result.theme ?? "overall"] ?? "#c9a84c";
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 8;
+      ctx.globalAlpha = 0.85;
 
-        ctx.beginPath();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2.5;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 8;
-        ctx.globalAlpha = 0.85;
+      const [first, ...rest] = result.coordinates;
+      ctx.moveTo(first[0] * w, first[1] * h);
+      rest.forEach(([x, y]) => ctx.lineTo(x * w, y * h));
+      ctx.stroke();
 
-        const [first, ...rest] = result.coordinates;
-        ctx.moveTo(first[0] * canvas.width, first[1] * canvas.height);
-        rest.forEach(([x, y]) => {
-          ctx.lineTo(x * canvas.width, y * canvas.height);
-        });
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
-      });
-    };
-    img.src = imageUrl;
-  }, [imageUrl, results]);
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+    });
+  }, [results]);
 
-  // 凡例（座標があるテーマのみ表示）
+  useEffect(() => {
+    drawLines();
+  }, [drawLines]);
+
   const legendItems = results
     .filter((r) => r.coordinates && r.coordinates.length >= 2)
     .map((r) => ({
@@ -76,8 +74,18 @@ export function ResultCanvas({ imageUrl, results }: Props) {
 
   return (
     <div className="space-y-2">
-      <div ref={containerRef} className="w-full rounded-2xl overflow-hidden bg-[oklch(0.10_0.02_280)]">
-        <canvas ref={canvasRef} className="w-full h-auto" />
+      <div className="relative w-full rounded-2xl overflow-hidden bg-[oklch(0.10_0.02_280)]">
+        <img
+          ref={imgRef}
+          src={imageUrl}
+          alt="手相"
+          className="w-full h-auto block"
+          onLoad={drawLines}
+        />
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+        />
       </div>
       {legendItems.length > 0 && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 px-1">

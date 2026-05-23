@@ -39,7 +39,7 @@ export function DiagnoseResultCard({ results, isBoth }: Props) {
                 >
                   {result.label}
                 </Badge>
-                {handInfo && (
+                {handInfo && isBoth && (
                   <Badge
                     variant="outline"
                     className="text-xs tracking-wider font-light"
