@@ -43,41 +43,45 @@ export function ResultCanvas({ imageUrl, results }: Props) {
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, w, h);
 
+    const minPad = Math.min(w, h) * 0.04;
+
     results.forEach((result) => {
-      if (!result.coordinates || result.coordinates.length < 2) return;
+      if (!result.coordinates || result.coordinates.length < 1) return;
       const color = THEME_COLORS[result.theme ?? "overall"] ?? "#c9a84c";
       const pts = result.coordinates.map(([x, y]): [number, number] => [x * w, y * h]);
 
+      const xs = pts.map(([x]) => x);
+      const ys = pts.map(([, y]) => y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const rx = Math.max((maxX - minX) / 2 + minPad, minPad * 2);
+      const ry = Math.max((maxY - minY) / 2 + minPad, minPad * 2);
+
       ctx.save();
+
+      // 塗りつぶし（淡い）
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 破線の楕円枠
       ctx.strokeStyle = color;
-      ctx.lineWidth = 3;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.setLineDash([10, 6]);
-      ctx.globalAlpha = 0.92;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([8, 4]);
+      ctx.globalAlpha = 0.9;
       ctx.shadowColor = color;
       ctx.shadowBlur = 14;
-
       ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-
-      if (pts.length === 2) {
-        ctx.lineTo(pts[1][0], pts[1][1]);
-      } else {
-        // 中点ベジェ曲線でなめらかにつなぐ
-        for (let i = 0; i < pts.length - 1; i++) {
-          const midX = (pts[i][0] + pts[i + 1][0]) / 2;
-          const midY = (pts[i][1] + pts[i + 1][1]) / 2;
-          if (i === 0) {
-            ctx.lineTo(midX, midY);
-          } else {
-            ctx.quadraticCurveTo(pts[i][0], pts[i][1], midX, midY);
-          }
-        }
-        ctx.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]);
-      }
-
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
       ctx.stroke();
+
       ctx.restore();
     });
   }, [results]);
