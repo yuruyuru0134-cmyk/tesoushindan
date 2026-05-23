@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/palm/ImageUploader";
 import { ThemeSelector } from "@/components/palm/ThemeSelector";
-import { ResultCanvas } from "@/components/palm/ResultCanvas";
 import { DiagnoseResultCard } from "@/components/palm/DiagnoseResult";
 import { DiagnoseResult, DiagnoseThemeKey } from "@/types/palm";
 import { StarField } from "@/components/StarField";
@@ -82,14 +81,6 @@ export default function DiagnosePage() {
 
   const hasAnyImage = !!(leftHand || rightHand);
   const isBoth = !!(leftHand && rightHand);
-
-  // 左右別に結果を分類（hand フィールドが未設定の場合は両手に表示）
-  const leftResults = isBoth
-    ? results.filter((r) => !r.hand || r.hand === "left" || r.hand === "both")
-    : results;
-  const rightResults = isBoth
-    ? results.filter((r) => !r.hand || r.hand === "right" || r.hand === "both")
-    : results;
 
   return (
     <div className="min-h-screen relative">
@@ -176,30 +167,7 @@ export default function DiagnosePage() {
           </div>
         ) : (
           /* 結果エリア */
-          <div className="max-w-4xl mx-auto space-y-8">
-            {/* 両手の場合は2カラム、片手は1カラム */}
-            <div className={`grid gap-6 ${isBoth ? "md:grid-cols-2" : "max-w-xl mx-auto"}`}>
-              {leftHand && (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[oklch(0.78_0.12_85)] text-sm tracking-wider font-light">左手</p>
-                    <p className="text-[oklch(0.45_0.01_80)] text-xs tracking-wide">先天的な才能・過去</p>
-                  </div>
-                  <ResultCanvas imageUrl={leftHand.previewUrl} results={leftResults} />
-                </div>
-              )}
-              {rightHand && (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[oklch(0.78_0.12_85)] text-sm tracking-wider font-light">右手</p>
-                    <p className="text-[oklch(0.45_0.01_80)] text-xs tracking-wide">現在〜未来の運勢</p>
-                  </div>
-                  <ResultCanvas imageUrl={rightHand.previewUrl} results={rightResults} />
-                </div>
-              )}
-            </div>
-
-            {/* 診断テキスト */}
+          <div className="max-w-3xl mx-auto">
             <DiagnoseResultCard results={results} isBoth={isBoth} />
           </div>
         )}
