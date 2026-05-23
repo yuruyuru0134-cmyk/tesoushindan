@@ -180,7 +180,7 @@ themeキー: overall/longevity/money/love/rarity/aptitude
       body: JSON.stringify({
         inputs: { tesougazou },
         query,
-        response_mode: "streaming",
+        response_mode: "blocking",
         user: "palm-user",
       }),
     });
@@ -190,70 +190,15 @@ themeキー: overall/longevity/money/love/rarity/aptitude
       return NextResponse.json({ error: "診断の実行に失敗しました" }, { status: 500 });
     }
 
-    const encoder = new TextEncoder();
+    const runData = await runRes.json();
+    const rawAnswer: string = runData?.answer ?? "";
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = runRes.body!.getReader();
-        const decoder = new TextDecoder();
-        let lineBuffer = "";
-        let fullAnswer = "";
-        let resultsSent = false;
+    const results = parseAndFilterResults(rawAnswer, selectedThemes, isBoth, leftId);
 
-        const send = (data: unknown) =>
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            lineBuffer += decoder.decode(value, { stream: true });
-            const lines = lineBuffer.split("\n");
-            lineBuffer = lines.pop() ?? "";
-
-            for (const line of lines) {
-              if (!line.startsWith("data: ")) continue;
-              const raw = line.slice(6).trim();
-              if (!raw || raw === "[DONE]") continue;
-
-              try {
-                const parsed = JSON.parse(raw);
-                if (parsed.event === "message" && parsed.answer) {
-                  fullAnswer += parsed.answer;
-                } else if (parsed.event === "message_end") {
-                  const results = parseAndFilterResults(fullAnswer, selectedThemes, isBoth, leftId);
-                  send({ type: "result", results, hasLeft: !!leftId, hasRight: !!rightId });
-                  resultsSent = true;
-                } else if (parsed.event === "error") {
-                  send({ type: "error", message: "Dify処理中にエラーが発生しました" });
-                  resultsSent = true;
-                }
-              } catch {
-                // malformed SSE line はスキップ
-              }
-            }
-          }
-
-          if (!resultsSent && fullAnswer) {
-            const results = parseAndFilterResults(fullAnswer, selectedThemes, isBoth, leftId);
-            send({ type: "result", results, hasLeft: !!leftId, hasRight: !!rightId });
-          }
-        } catch (err) {
-          console.error("Stream processing error:", err);
-          if (!resultsSent) send({ type: "error", message: "予期せぬエラーが発生しました" });
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-      },
+    return NextResponse.json({
+      results,
+      hasLeft: !!leftId,
+      hasRight: !!rightId,
     });
   } catch (err) {
     console.error("Diagnose API error:", err);
