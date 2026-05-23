@@ -6,38 +6,39 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/palm/ImageUploader";
 import { ThemeSelector } from "@/components/palm/ThemeSelector";
-import { HandSelector } from "@/components/palm/HandSelector";
 import { ResultCanvas } from "@/components/palm/ResultCanvas";
 import { DiagnoseResultCard } from "@/components/palm/DiagnoseResult";
-import { DiagnoseResult, HandType, DiagnoseThemeKey } from "@/types/palm";
+import { DiagnoseResult, DiagnoseThemeKey } from "@/types/palm";
 
 type DiagnoseState = "idle" | "loading" | "done";
 
+interface HandImage {
+  file: File;
+  previewUrl: string;
+}
+
 export default function DiagnosePage() {
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [leftHand, setLeftHand] = useState<HandImage | null>(null);
+  const [rightHand, setRightHand] = useState<HandImage | null>(null);
   const [selectedThemes, setSelectedThemes] = useState<DiagnoseThemeKey[]>(["overall"]);
-  const [handType, setHandType] = useState<HandType>("right");
   const [state, setState] = useState<DiagnoseState>("idle");
   const [results, setResults] = useState<DiagnoseResult[]>([]);
 
-  const handleImageSelect = useCallback((file: File, url: string) => {
-    if (!file) {
-      setImageFile(null);
-      setPreviewUrl(null);
-      setResults([]);
-      setState("idle");
-      return;
-    }
-    setImageFile(file);
-    setPreviewUrl(url);
+  const handleLeft = useCallback((file: File, url: string) => {
+    setLeftHand(file ? { file, previewUrl: url } : null);
+    setResults([]);
+    setState("idle");
+  }, []);
+
+  const handleRight = useCallback((file: File, url: string) => {
+    setRightHand(file ? { file, previewUrl: url } : null);
     setResults([]);
     setState("idle");
   }, []);
 
   const handleDiagnose = async () => {
-    if (!imageFile) {
-      toast.error("手のひら画像をアップロードしてください");
+    if (!leftHand && !rightHand) {
+      toast.error("左手か右手、どちらかの画像をアップロードしてください");
       return;
     }
     if (selectedThemes.length === 0) {
@@ -48,20 +49,14 @@ export default function DiagnosePage() {
     setState("loading");
     try {
       const formData = new FormData();
-      formData.append("image", imageFile);
+      if (leftHand) formData.append("imageLeft", leftHand.file);
+      if (rightHand) formData.append("imageRight", rightHand.file);
       formData.append("selectedThemes", JSON.stringify(selectedThemes));
-      formData.append("handType", handType);
 
-      const res = await fetch("/api/diagnose", {
-        method: "POST",
-        body: formData,
-      });
-
+      const res = await fetch("/api/diagnose", { method: "POST", body: formData });
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error ?? "診断に失敗しました");
-      }
+      if (!res.ok) throw new Error(data.error ?? "診断に失敗しました");
 
       setResults(data.results);
       setState("done");
@@ -73,15 +68,21 @@ export default function DiagnosePage() {
   };
 
   const handleReset = () => {
-    setImageFile(null);
-    setPreviewUrl(null);
+    setLeftHand(null);
+    setRightHand(null);
     setResults([]);
     setState("idle");
   };
 
+  const hasAnyImage = !!(leftHand || rightHand);
+  const isBoth = !!(leftHand && rightHand);
+
+  // 左右別に結果を分類
+  const leftResults = results.filter((r) => r.hand === "left" || r.hand === "both");
+  const rightResults = results.filter((r) => r.hand === "right" || r.hand === "both");
+
   return (
     <div className="min-h-screen relative">
-      {/* 背景 */}
       <div className="fixed inset-0 bg-gradient-to-br from-[oklch(0.08_0.03_280)] via-[oklch(0.12_0.02_280)] to-[oklch(0.10_0.025_260)] -z-10" />
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[oklch(0.78_0.12_85/3%)] blur-3xl -z-10 pointer-events-none" />
 
@@ -93,10 +94,7 @@ export default function DiagnosePage() {
             className="flex items-center gap-2 text-[oklch(0.78_0.12_85)] hover:text-[oklch(0.90_0.12_85)] transition-colors"
           >
             <span className="text-sm">←</span>
-            <span
-              className="text-sm tracking-[0.15em] font-light"
-              style={{ fontFamily: "var(--font-cormorant), serif" }}
-            >
+            <span className="text-sm tracking-[0.15em] font-light" style={{ fontFamily: "var(--font-cormorant), serif" }}>
               手相診てみます
             </span>
           </Link>
@@ -114,68 +112,84 @@ export default function DiagnosePage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* タイトル */}
         <div className="text-center mb-10 space-y-2">
-          <p className="text-[oklch(0.78_0.12_85)] text-xs tracking-[0.3em] uppercase font-light">
-            ✦ Palm Reading ✦
-          </p>
-          <h1
-            className="text-2xl md:text-3xl font-light tracking-[0.1em] text-[oklch(0.94_0.01_80)]"
-            style={{ fontFamily: "var(--font-cormorant), serif" }}
-          >
+          <p className="text-[oklch(0.78_0.12_85)] text-xs tracking-[0.3em] uppercase font-light">✦ Palm Reading ✦</p>
+          <h1 className="text-2xl md:text-3xl font-light tracking-[0.1em] text-[oklch(0.94_0.01_80)]" style={{ fontFamily: "var(--font-cormorant), serif" }}>
             手相を診断する
           </h1>
         </div>
 
         {state !== "done" ? (
-          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {/* 左: 画像アップロード */}
-            <div className="space-y-3">
-              <p className="text-[oklch(0.65_0.02_80)] text-xs tracking-wider">
-                手のひら画像
-              </p>
-              <ImageUploader onImageSelect={handleImageSelect} previewUrl={previewUrl} />
+          <div className="max-w-3xl mx-auto space-y-6">
+            {/* 左右アップロードエリア */}
+            <div className="grid grid-cols-2 gap-4">
+              {(["left", "right"] as const).map((side) => {
+                const hand = side === "left" ? leftHand : rightHand;
+                const label = side === "left" ? "左手" : "右手";
+                const meaning = side === "left" ? "先天的な才能・過去" : "現在〜未来の運勢";
+                return (
+                  <div key={side} className="space-y-2">
+                    <div className="flex flex-col">
+                      <span className="text-[oklch(0.78_0.12_85)] text-sm tracking-wider font-light">{label}</span>
+                      <span className="text-[oklch(0.45_0.01_80)] text-xs tracking-wide">{meaning}</span>
+                    </div>
+                    <ImageUploader
+                      onImageSelect={side === "left" ? handleLeft : handleRight}
+                      previewUrl={hand?.previewUrl ?? null}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
-            {/* 右: 設定 */}
-            <div className="space-y-5 flex flex-col">
-              <HandSelector selected={handType} onChange={setHandType} />
-              <div className="flex-1">
-                <ThemeSelector selected={selectedThemes} onChange={setSelectedThemes} />
-              </div>
-              <Button
-                onClick={handleDiagnose}
-                disabled={!imageFile || selectedThemes.length === 0 || state === "loading"}
-                className="w-full bg-[oklch(0.78_0.12_85)] hover:bg-[oklch(0.72_0.12_85)] disabled:opacity-40 text-[oklch(0.12_0.02_280)] font-medium tracking-[0.15em] py-6 text-sm transition-all duration-300 hover:shadow-[0_0_30px_oklch(0.78_0.12_85/25%)]"
-              >
-                {state === "loading" ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                    </svg>
-                    診断中...
-                  </span>
-                ) : (
-                  "✦ 診断する"
-                )}
-              </Button>
-            </div>
+            {/* 診断テーマ + ボタン */}
+            <ThemeSelector selected={selectedThemes} onChange={setSelectedThemes} />
+
+            <Button
+              onClick={handleDiagnose}
+              disabled={!hasAnyImage || selectedThemes.length === 0 || state === "loading"}
+              className="w-full bg-[oklch(0.78_0.12_85)] hover:bg-[oklch(0.72_0.12_85)] disabled:opacity-40 text-[oklch(0.12_0.02_280)] font-medium tracking-[0.15em] py-6 text-sm transition-all duration-300 hover:shadow-[0_0_30px_oklch(0.78_0.12_85/25%)]"
+            >
+              {state === "loading" ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  診断中...
+                </span>
+              ) : (
+                `✦ ${isBoth ? "両手を診断する" : "診断する"}`
+              )}
+            </Button>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {/* 左: 画像（ライン描画） */}
-            <div className="space-y-3">
-              <p className="text-[oklch(0.65_0.02_80)] text-xs tracking-wider">
-                手相ライン
-              </p>
-              {previewUrl && <ResultCanvas imageUrl={previewUrl} results={results} />}
+          /* 結果エリア */
+          <div className="max-w-4xl mx-auto space-y-8">
+            {/* 両手の場合は2カラム、片手は1カラム */}
+            <div className={`grid gap-6 ${isBoth ? "md:grid-cols-2" : "max-w-xl mx-auto"}`}>
+              {leftHand && (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[oklch(0.78_0.12_85)] text-sm tracking-wider font-light">左手</p>
+                    <p className="text-[oklch(0.45_0.01_80)] text-xs tracking-wide">先天的な才能・過去</p>
+                  </div>
+                  <ResultCanvas imageUrl={leftHand.previewUrl} results={leftResults} />
+                </div>
+              )}
+              {rightHand && (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[oklch(0.78_0.12_85)] text-sm tracking-wider font-light">右手</p>
+                    <p className="text-[oklch(0.45_0.01_80)] text-xs tracking-wide">現在〜未来の運勢</p>
+                  </div>
+                  <ResultCanvas imageUrl={rightHand.previewUrl} results={rightResults} />
+                </div>
+              )}
             </div>
 
-            {/* 右: テキスト結果 */}
-            <div className="space-y-3 overflow-y-auto max-h-[600px]">
-              <DiagnoseResultCard results={results} handType={handType} />
-            </div>
+            {/* 診断テキスト */}
+            <DiagnoseResultCard results={results} isBoth={isBoth} />
           </div>
         )}
       </main>

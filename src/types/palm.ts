@@ -67,10 +67,11 @@ export const DIAGNOSE_THEMES: DiagnoseTheme[] = [
 
 // 結果の型（Difyが返すJSON）
 export interface DiagnoseResult {
+  hand?: "left" | "right" | "both";
   theme?: DiagnoseThemeKey;
   label: string;
   description: string;
-  lines?: string[];       // 関連する手相ラインの名前（任意）
+  lines?: string[];
   coordinates?: [number, number][];
 }
 
