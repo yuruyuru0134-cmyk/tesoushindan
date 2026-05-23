@@ -56,48 +56,56 @@ export default function DiagnosePage() {
       const res = await fetch("/api/diagnose", { method: "POST", body: formData });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "診断に失敗しました");
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "診断に失敗しました");
       }
 
-      const reader = res.body!.getReader();
+      if (!res.body) {
+        throw new Error("ストリーミングレスポンスが取得できませんでした。再度お試しください。");
+      }
+
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       let received = false;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const raw = line.slice(6).trim();
-          if (!raw) continue;
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6).trim();
+            if (!raw) continue;
 
-          let parsed: { type: string; results?: DiagnoseResult[]; message?: string };
-          try {
-            parsed = JSON.parse(raw);
-          } catch {
-            continue;
-          }
+            let parsed: { type: string; results?: DiagnoseResult[]; message?: string };
+            try {
+              parsed = JSON.parse(raw);
+            } catch {
+              continue;
+            }
 
-          if (parsed.type === "result" && parsed.results) {
-            const correctHand = !rightHand ? "left" : !leftHand ? "right" : null;
-            const normalized = correctHand
-              ? parsed.results.map((r) => ({ ...r, hand: correctHand as DiagnoseResult["hand"] }))
-              : parsed.results;
-            setResults(normalized);
-            setState("done");
-            toast.success("診断が完了しました");
-            received = true;
-          } else if (parsed.type === "error") {
-            throw new Error(parsed.message ?? "診断に失敗しました");
+            if (parsed.type === "result" && parsed.results) {
+              const correctHand = !rightHand ? "left" : !leftHand ? "right" : null;
+              const normalized = correctHand
+                ? parsed.results.map((r) => ({ ...r, hand: correctHand as DiagnoseResult["hand"] }))
+                : parsed.results;
+              setResults(normalized);
+              setState("done");
+              toast.success("診断が完了しました");
+              received = true;
+            } else if (parsed.type === "error") {
+              throw new Error(parsed.message ?? "診断に失敗しました");
+            }
           }
         }
+      } finally {
+        reader.releaseLock();
       }
 
       if (!received) throw new Error("診断結果が受信できませんでした。再度お試しください。");
