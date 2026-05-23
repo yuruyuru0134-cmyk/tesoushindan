@@ -54,18 +54,53 @@ export default function DiagnosePage() {
       formData.append("selectedThemes", JSON.stringify(selectedThemes));
 
       const res = await fetch("/api/diagnose", { method: "POST", body: formData });
-      const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error ?? "診断に失敗しました");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "診断に失敗しました");
+      }
 
-      // 片手モードのとき hand フィールドを正規化（Dify が誤ったラベルを返す場合の対策）
-      const correctHand = !rightHand ? "left" : !leftHand ? "right" : null;
-      const normalized = correctHand
-        ? (data.results as DiagnoseResult[]).map((r) => ({ ...r, hand: correctHand as DiagnoseResult["hand"] }))
-        : (data.results as DiagnoseResult[]);
-      setResults(normalized);
-      setState("done");
-      toast.success("診断が完了しました");
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let received = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+
+          let parsed: { type: string; results?: DiagnoseResult[]; message?: string };
+          try {
+            parsed = JSON.parse(raw);
+          } catch {
+            continue;
+          }
+
+          if (parsed.type === "result" && parsed.results) {
+            const correctHand = !rightHand ? "left" : !leftHand ? "right" : null;
+            const normalized = correctHand
+              ? parsed.results.map((r) => ({ ...r, hand: correctHand as DiagnoseResult["hand"] }))
+              : parsed.results;
+            setResults(normalized);
+            setState("done");
+            toast.success("診断が完了しました");
+            received = true;
+          } else if (parsed.type === "error") {
+            throw new Error(parsed.message ?? "診断に失敗しました");
+          }
+        }
+      }
+
+      if (!received) throw new Error("診断結果が受信できませんでした。再度お試しください。");
     } catch (err) {
       setState("idle");
       toast.error(err instanceof Error ? err.message : "診断に失敗しました");
