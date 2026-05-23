@@ -161,10 +161,17 @@ ${themeInstructions}
 【出力ルール】${bothHandsNote}
 JSON配列のみ返してください（前置き・後書き不要）。
 
-[{"hand":"left","theme":"overall","label":"総合診断（左手）","description":"80〜120文字の具体的な診断","lines":["生命線"],"coordinates":[[0.3,0.4],[0.5,0.6]]}]
+[{"hand":"left","theme":"overall","label":"総合診断（左手）","description":"80〜120文字の具体的な診断","lines":["生命線"],"coordinates":[[0.35,0.15],[0.32,0.28],[0.28,0.42],[0.25,0.55],[0.23,0.68],[0.22,0.80]]}]
 
 themeキー: overall/longevity/money/love/rarity/aptitude
-coordinates: 左上(0,0)右下(1,1)の相対座標3〜5点。ラインが見当たらない場合は[]。`;
+
+【coordinates - 最重要】
+診断に使用した手相ラインを画像上で実際になぞるように座標を記録してください。
+・座標系: 画像の左上隅=(0,0)、右下隅=(1,1)
+・各ラインの始点→途中の曲がり目→終点まで8〜12点を順番に記録
+・ラインの曲がり方・弧を忠実に再現する（直線ではなく実際のカーブに沿って）
+・画像内でラインが明確に視認できる場合のみ座標を記録。不明確な場合は[]
+・精度が最重要: 実際のラインの位置に正確に配置してください`;
 
     const runRes = await fetch(`${difyApiUrl}/chat-messages`, {
       method: "POST",

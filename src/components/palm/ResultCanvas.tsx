@@ -46,23 +46,39 @@ export function ResultCanvas({ imageUrl, results }: Props) {
     results.forEach((result) => {
       if (!result.coordinates || result.coordinates.length < 2) return;
       const color = THEME_COLORS[result.theme ?? "overall"] ?? "#c9a84c";
+      const pts = result.coordinates.map(([x, y]): [number, number] => [x * w, y * h]);
 
-      ctx.beginPath();
+      ctx.save();
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
+      ctx.setLineDash([10, 6]);
+      ctx.globalAlpha = 0.92;
       ctx.shadowColor = color;
-      ctx.shadowBlur = 8;
-      ctx.globalAlpha = 0.85;
+      ctx.shadowBlur = 14;
 
-      const [first, ...rest] = result.coordinates;
-      ctx.moveTo(first[0] * w, first[1] * h);
-      rest.forEach(([x, y]) => ctx.lineTo(x * w, y * h));
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+
+      if (pts.length === 2) {
+        ctx.lineTo(pts[1][0], pts[1][1]);
+      } else {
+        // 中点ベジェ曲線でなめらかにつなぐ
+        for (let i = 0; i < pts.length - 1; i++) {
+          const midX = (pts[i][0] + pts[i + 1][0]) / 2;
+          const midY = (pts[i][1] + pts[i + 1][1]) / 2;
+          if (i === 0) {
+            ctx.lineTo(midX, midY);
+          } else {
+            ctx.quadraticCurveTo(pts[i][0], pts[i][1], midX, midY);
+          }
+        }
+        ctx.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+      }
+
       ctx.stroke();
-
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
+      ctx.restore();
     });
   }, [results]);
 
