@@ -9,6 +9,7 @@ import { ThemeSelector } from "@/components/palm/ThemeSelector";
 import { ResultCanvas } from "@/components/palm/ResultCanvas";
 import { DiagnoseResultCard } from "@/components/palm/DiagnoseResult";
 import { DiagnoseResult, DiagnoseThemeKey } from "@/types/palm";
+import { StarField } from "@/components/StarField";
 
 type DiagnoseState = "idle" | "loading" | "done";
 
@@ -92,7 +93,8 @@ export default function DiagnosePage() {
 
   return (
     <div className="min-h-screen relative">
-      <div className="fixed inset-0 bg-gradient-to-br from-[oklch(0.08_0.03_280)] via-[oklch(0.12_0.02_280)] to-[oklch(0.10_0.025_260)] -z-10" />
+      <div className="fixed inset-0 bg-gradient-to-br from-[oklch(0.06_0.03_280)] via-[oklch(0.10_0.025_270)] to-[oklch(0.08_0.03_260)] -z-10" />
+      <div className="fixed inset-0 -z-10"><StarField /></div>
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[oklch(0.78_0.12_85/3%)] blur-3xl -z-10 pointer-events-none" />
 
       {/* ヘッダー */}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StarField } from "@/components/StarField";
 
 const PALM_LINES = [
   { name: "生命線", color: "#e05f5f" },
@@ -12,8 +13,9 @@ const PALM_LINES = [
 export default function HomePage() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
-      {/* 背景装飾 */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[oklch(0.08_0.03_280)] via-[oklch(0.12_0.02_280)] to-[oklch(0.10_0.025_260)]" />
+      {/* 背景 */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[oklch(0.06_0.03_280)] via-[oklch(0.10_0.025_270)] to-[oklch(0.08_0.03_260)]" />
+      <StarField />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full bg-[oklch(0.78_0.12_85/4%)] blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] rounded-full bg-[oklch(0.6_0.15_280/6%)] blur-3xl pointer-events-none" />
 
