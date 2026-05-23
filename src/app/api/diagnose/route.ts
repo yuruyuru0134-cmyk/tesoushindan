@@ -170,6 +170,26 @@ ${bothHandsNote}
       });
     }
 
+    // 選択したテーマ以外の結果を除去
+    results = results.filter(
+      (r) => !r.theme || selectedThemes.includes(r.theme as DiagnoseThemeKey)
+    );
+
+    // 片手モード: 正しい手の結果のみ残し、テーマ重複を除去
+    if (!isBoth) {
+      const targetHand = leftId ? "left" : "right";
+      results = results.filter(
+        (r) => !r.hand || r.hand === targetHand || r.hand === "both"
+      );
+      const seen = new Set<string>();
+      results = results.filter((r) => {
+        const key = r.theme ?? "_unknown";
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
     return NextResponse.json({
       results,
       hasLeft: !!leftId,

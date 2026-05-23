@@ -26,16 +26,21 @@ export function ResultCanvas({ imageUrl, results }: Props) {
     const img = imgRef.current;
     if (!canvas || !img || !img.complete || img.naturalWidth === 0) return;
 
-    const w = img.clientWidth;
-    const h = img.clientHeight;
+    const rect = img.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
     if (w === 0 || h === 0) return;
 
-    canvas.width = w;
-    canvas.height = h;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, w, h);
 
     results.forEach((result) => {
@@ -65,6 +70,15 @@ export function ResultCanvas({ imageUrl, results }: Props) {
     drawLines();
   }, [drawLines]);
 
+  // リサイズ時にキャンバスを再描画
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    const ro = new ResizeObserver(() => drawLines());
+    ro.observe(img);
+    return () => ro.disconnect();
+  }, [drawLines]);
+
   const legendItems = results
     .filter((r) => r.coordinates && r.coordinates.length >= 2)
     .map((r) => ({
@@ -84,7 +98,7 @@ export function ResultCanvas({ imageUrl, results }: Props) {
         />
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 w-full h-full pointer-events-none"
+          className="absolute inset-0 pointer-events-none"
         />
       </div>
       {legendItems.length > 0 && (
